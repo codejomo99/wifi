@@ -1,7 +1,7 @@
-
   
 
-  <%@ page contentType="text/html; charset=UTF-8" language="java" pageEncoding="UTF-8"%>
+  
+<%@ page contentType="text/html; charset=UTF-8" language="java" pageEncoding="UTF-8" %>
 <!DOCTYPE html>
 <html>
 <head>
@@ -11,9 +11,11 @@
             width: 100%;
             border-collapse: collapse;
         }
+
         table, th, td {
             border: 1px solid black;
         }
+
         th, td {
             padding: 10px;
             text-align: left;
@@ -21,7 +23,19 @@
     </style>
 </head>
 <body>
-<h1>서울시 공공와이파이 위치 정보</h1>
+<body>
+<h1>서울시 공공와이파이 위치 정보 보기</h1>
+
+<!-- 메뉴 항목 추가 -->
+<div class="menu">
+    <a href="/">홈</a>
+    <a href="/history">위치 히스토리 목록</a>
+    <a href="/wifi">Open API 와이파이 정보 가져오기</a>
+    <a href="/favorites">즐겨찾기 보기</a>
+    <a href="/group">즐겨찾기 그룹 관리</a>
+</div>
+<br>
+<br>
 <table>
     <thead>
     <tr>
@@ -68,25 +82,42 @@
             String distance = "근처";  // 거리 계산 필요
     %>
     <tr>
-        <td><%= distance %></td>
-        <td><%= getValue(entry, "X_SWIFI_MGR_NO") %></td>
-        <td><%= getValue(entry, "X_SWIFI_WRDOFC") %></td>
-        <td><%= getValue(entry, "X_SWIFI_MAIN_NM") %></td>
-        <td><%= getValue(entry, "X_SWIFI_ADRES1") %></td>
-        <td><%= getValue(entry, "X_SWIFI_ADRES2") %></td>
-        <td><%= getValue(entry, "X_SWIFI_INSTL_FLOOR") %></td>
-        <td><%= getValue(entry, "X_SWIFI_INSTL_TY") %></td>
-        <td><%= getValue(entry, "X_SWIFI_INSTL_MBY") %></td>
-        <td><%= getValue(entry, "X_SWIFI_SVC_SE") %></td>
-        <td><%= getValue(entry, "X_SWIFI_CMCWR") %></td>
-        <td><%= getValue(entry, "X_SWIFI_CNSTC_YEAR") %></td>
-        <td><%= getValue(entry, "X_SWIFI_INOUT_DOOR") %></td>
-        <td><%= getValue(entry, "X_SWIFI_REMARS3") %></td>
-        <td><%= lat %></td>
-        <td><%= lnt %></td>
-        <td><%= getValue(entry, "WORK_DTTM") %></td>
+        <td><%= distance %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_MGR_NO") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_WRDOFC") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_MAIN_NM") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_ADRES1") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_ADRES2") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_INSTL_FLOOR") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_INSTL_TY") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_INSTL_MBY") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_SVC_SE") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_CMCWR") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_CNSTC_YEAR") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_INOUT_DOOR") %>
+        </td>
+        <td><%= getValue(entry, "X_SWIFI_REMARS3") %>
+        </td>
+        <td><%= lat %>
+        </td>
+        <td><%= lnt %>
+        </td>
+        <td><%= getValue(entry, "WORK_DTTM") %>
+        </td>
     </tr>
-    <%  } %>
+    <% } %>
     </tbody>
 </table>
 

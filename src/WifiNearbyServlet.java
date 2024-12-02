@@ -6,59 +6,43 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.HashSet;
+import java.util.Set;
 
 @WebServlet("/wifiNear")
 public class WifiNearbyServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        String apiKey = "6b494b70436a6f6d313330577752636e";  // 실제 API 키로 교체하세요
+        String userLat = request.getParameter("lat");
+        String userLng = request.getParameter("lng");
+
+        if (userLat == null || userLng == null) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().write("{\"error\": \"위치 정보가 필요합니다.\"}");
+            return;
+        }
+
+        System.out.println(userLat + " " + userLng);
+
+        String apiKey = "6b494b70436a6f6d313330577752636e"; // 실제 API 키로 교체
         StringBuilder result = new StringBuilder();
 
-        System.out.println("실행되었습니다.");
-
-        // 사용자 위치 정보 받기
-        String latParam = request.getParameter("lat");
-        String lngParam = request.getParameter("lng");
-
-        // lat, lng 값이 비어 있거나 숫자가 아니면 에러 처리
-        if (latParam == null || lngParam == null || latParam.isEmpty() || lngParam.isEmpty()) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "위치 정보가 부족합니다.");
-            return;
-        }
-
-        double userLat = 0;
-        double userLng = 0;
         try {
-            userLat = Double.parseDouble(latParam);  // lat를 double로 변환
-            userLng = Double.parseDouble(lngParam);  // lng를 double로 변환
-        } catch (NumberFormatException e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "잘못된 위치 정보 형식입니다.");
-            return;
-        }
-
-        try {
-            StringBuilder urlBuilder = new StringBuilder("http://openapi.seoul.go.kr:8088");
-            urlBuilder.append("/").append(URLEncoder.encode(apiKey, "UTF-8"));
-            urlBuilder.append("/").append(URLEncoder.encode("json", "UTF-8"));
-            urlBuilder.append("/").append(URLEncoder.encode("TbPublicWifiInfo", "UTF-8"));
-            urlBuilder.append("/").append(URLEncoder.encode("1", "UTF-8"));
-            urlBuilder.append("/").append(URLEncoder.encode("5", "UTF-8"));
-
-            URL url = new URL(urlBuilder.toString());
+            String apiUrl = "http://openapi.seoul.go.kr:8088/" + URLEncoder.encode(apiKey, "UTF-8") +
+                    "/json/TbPublicWifiInfo/1/1000";
+            URL url = new URL(apiUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-type", "application/json");
 
-            BufferedReader rd;
-            if (conn.getResponseCode() >= 200 && conn.getResponseCode() <= 300) {
-                rd = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            } else {
-                rd = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
-            }
+            BufferedReader rd = (conn.getResponseCode() >= 200 && conn.getResponseCode() <= 300)
+                    ? new BufferedReader(new InputStreamReader(conn.getInputStream()))
+                    : new BufferedReader(new InputStreamReader(conn.getErrorStream()));
+
             String line;
             while ((line = rd.readLine()) != null) {
                 result.append(line);
@@ -69,67 +53,66 @@ public class WifiNearbyServlet extends HttpServlet {
             e.printStackTrace();
         }
 
-        // 받아온 Wi-Fi 데이터 JSON 파싱 (순수 문자열 처리)
-        String wifiJsonData = result.toString();
-        String wifiDataArray = extractJsonArray(wifiJsonData);
+        // JSON 문자열에서 직접 파싱
+        String responseJson = result.toString();
+        String[] rows = responseJson.split("\"row\":\\[")[1].split("]")[0].split("\\},\\{");
+        StringBuilder filteredJson = new StringBuilder();
+        filteredJson.append("{\"wifiData\":[");
 
-        // 근처 Wi-Fi 필터링
-        StringBuilder nearbyWifiArray = new StringBuilder();
-        String[] wifiEntries = wifiDataArray.split("},");  // 각 Wi-Fi 항목 분리
+        double userLatDouble = Double.parseDouble(userLat);
+        double userLngDouble = Double.parseDouble(userLng);
 
-        for (String wifiEntry : wifiEntries) {
-            double wifiLat = extractDoubleValue(wifiEntry, "LAT");
-            double wifiLng = extractDoubleValue(wifiEntry, "LNT");
+        // Set을 사용하여 중복된 Wi-Fi 이름을 저장
+        Set<String> seenWifiNames = new HashSet<>();
 
-            // 거리 계산 (Haversine 공식)
-            double distance = calculateDistance(userLat, userLng, wifiLat, wifiLng);
-            if (distance <= 1.0) {  // 1km 이내
-                if (nearbyWifiArray.length() > 0) {
-                    nearbyWifiArray.append(",");
-                }
-                nearbyWifiArray.append("{").append(wifiEntry).append("}");
+        for (String row : rows) {
+            if (!row.startsWith("{")) row = "{" + row;
+            if (!row.endsWith("}")) row = row + "}";
+
+            String wifiName = extractValue(row, "\"X_SWIFI_MAIN_NM\":\"");
+            if (seenWifiNames.contains(wifiName)) {
+                continue; // 중복된 Wi-Fi 이름은 건너뜁니다
+            }
+
+            String latStr = extractValue(row, "\"LAT\":\"");
+            String lngStr = extractValue(row, "\"LNT\":\"");
+
+            double wifiLat = Double.parseDouble(latStr);
+            double wifiLng = Double.parseDouble(lngStr);
+            double distance = calculateDistance(userLatDouble, userLngDouble, wifiLat, wifiLng);
+
+            if (distance <= 10) {
+                row = row.substring(0, row.length() - 1) + ",\"distance\":" + distance + "}";
+                filteredJson.append(row).append(",");
+                seenWifiNames.add(wifiName); // 중복을 피하기 위해 Wi-Fi 이름을 Set에 추가
             }
         }
 
-        // 필터링된 Wi-Fi 데이터 응답으로 반환
-        // 필터링된 Wi-Fi 데이터 응답으로 반환
-        response.setContentType("application/json");
-        response.getWriter().write("{\"wifiData\": [" + nearbyWifiArray.toString() + "]}");
+        if (filteredJson.charAt(filteredJson.length() - 1) == ',') {
+            filteredJson.deleteCharAt(filteredJson.length() - 1);
+        }
+        filteredJson.append("]}");
+
+        response.setContentType("application/json; charset=UTF-8");
+        PrintWriter out = response.getWriter();
+        out.print(filteredJson);
+        out.flush();
     }
 
-    // Haversine formula로 두 지점 간의 거리를 계산하는 메소드
-    public static double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // 지구 반경 (단위: km)
+    private String extractValue(String json, String key) {
+        int startIndex = json.indexOf(key) + key.length();
+        int endIndex = json.indexOf("\"", startIndex);
+        return json.substring(startIndex, endIndex);
+    }
+
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371;
         double latDistance = Math.toRadians(lat2 - lat1);
         double lonDistance = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                        Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        double distance = R * c; // 단위: km
-        return distance;
+        return R * c;
     }
-
-    // JSON 데이터에서 배열 부분만 추출하는 메소드
-    private String extractJsonArray(String jsonData) {
-        int start = jsonData.indexOf("[");
-        int end = jsonData.lastIndexOf("]");
-        return jsonData.substring(start + 1, end);  // "["와 "]" 제외한 부분
-    }
-
-    // JSON 항목에서 특정 값을 추출하는 메소드 (숫자 값)
-    private double extractDoubleValue(String jsonEntry, String key) {
-        String searchKey = "\"" + key + "\":";
-        int startIndex = jsonEntry.indexOf(searchKey);
-        if (startIndex != -1) {
-            int valueStart = startIndex + searchKey.length();
-            int valueEnd = jsonEntry.indexOf(",", valueStart);
-            if (valueEnd == -1) valueEnd = jsonEntry.indexOf("}", valueStart);
-            String value = jsonEntry.substring(valueStart, valueEnd).trim();
-            return Double.parseDouble(value);
-        }
-        return 0.0;
-    }
-
-
 }

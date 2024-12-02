@@ -12,20 +12,21 @@ import java.net.URLEncoder;
 
 @WebServlet("/wifi")
 public class WifiServlet extends HttpServlet {
+
+    // http://localhost:8080/wifiNear?lat=37.5665&lng=126.9780
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         String apiKey = "6b494b70436a6f6d313330577752636e";  // 실제 API 키로 교체하세요
         StringBuilder result = new StringBuilder();
 
         System.out.println("WifiServlet 요청 들어옴!");
-
         try {
             StringBuilder urlBuilder = new StringBuilder("http://openapi.seoul.go.kr:8088");
             urlBuilder.append("/").append(URLEncoder.encode(apiKey, "UTF-8"));
             urlBuilder.append("/").append(URLEncoder.encode("json", "UTF-8"));
             urlBuilder.append("/").append(URLEncoder.encode("TbPublicWifiInfo", "UTF-8"));
             urlBuilder.append("/").append(URLEncoder.encode("1", "UTF-8"));
-            urlBuilder.append("/").append(URLEncoder.encode("5", "UTF-8"));
+            urlBuilder.append("/").append(URLEncoder.encode("50", "UTF-8"));
 
             URL url = new URL(urlBuilder.toString());
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -57,3 +58,4 @@ public class WifiServlet extends HttpServlet {
 
 
 }
+
