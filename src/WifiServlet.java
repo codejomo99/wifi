@@ -21,71 +21,113 @@ public class WifiServlet extends HttpServlet {
     private static final String DB_USER = "test";
     private static final String DB_PASSWORD = "yy223200@@";
 
+
+    @Override
+    public void init() throws ServletException {
+        // 서블릿 초기화 시 한 번만 TRUNCATE 실행
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                conn.createStatement().executeUpdate("TRUNCATE TABLE wifi_info");
+                System.out.println("wifi_info 테이블 초기화 완료!");
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        String apiKey = "6b494b70436a6f6d313330577752636e";
 
+        // 인코딩
+        response.setContentType("text/html; charset=UTF-8");
+        response.setCharacterEncoding("UTF-8");
+
+        String apiKey = "6b494b70436a6f6d313330577752636e";
         StringBuilder result = new StringBuilder();
+        int startIndex = 1;  // 시작 인덱스
+        int limit = 1000;  // 한 번에 요청할 데이터 개수
+        boolean moreData = true;
+        int totalSaved = 0;
 
         try {
-            StringBuilder urlBuilder = new StringBuilder("http://openapi.seoul.go.kr:8088");
-            urlBuilder.append("/").append(URLEncoder.encode(apiKey, "UTF-8"));
-            urlBuilder.append("/").append("json");
-            urlBuilder.append("/").append("TbPublicWifiInfo");
-            urlBuilder.append("/").append("1");
-            urlBuilder.append("/").append("1000");
+            while (moreData) {
+                StringBuilder urlBuilder = new StringBuilder("http://openapi.seoul.go.kr:8088");
+                urlBuilder.append("/").append(URLEncoder.encode(apiKey, "UTF-8"));
+                urlBuilder.append("/").append("json");
+                urlBuilder.append("/").append("TbPublicWifiInfo");
+                urlBuilder.append("/").append(startIndex);  // 시작 인덱스
+                urlBuilder.append("/").append(startIndex + limit - 1);  // 끝 인덱스 (startIndex + 999)
 
-            URL url = new URL(urlBuilder.toString());
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Content-type", "application/json");
+                URL url = new URL(urlBuilder.toString());
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("Content-type", "application/json");
 
-            BufferedReader rd = new BufferedReader(
-                    new InputStreamReader(conn.getResponseCode() >= 200 && conn.getResponseCode() <= 299
-                            ? conn.getInputStream() : conn.getErrorStream()));
+                BufferedReader rd = new BufferedReader(
+                        new InputStreamReader(conn.getResponseCode() >= 200 && conn.getResponseCode() <= 299
+                                ? conn.getInputStream() : conn.getErrorStream()));
 
-            String line;
-            while ((line = rd.readLine()) != null) {
-                result.append(line);
+                result.setLength(0);  // 이전 결과를 지우고 새로 읽음
+                String line;
+                while ((line = rd.readLine()) != null) {
+                    result.append(line);
+                }
+                rd.close();
+                conn.disconnect();
+
+                int start = result.indexOf("\"row\":[");
+                if (start == -1) {
+                    response.getWriter().println("데이터가 없습니다.");
+                    break;  // 더 이상 데이터가 없으면 종료
+                }
+                int end = result.indexOf("]", start);
+                String rowArrayString = result.substring(start + 7, end);
+                String[] wifiArray = rowArrayString.split("},\\{");
+
+                // DB에 저장
+                saveWifiDataToDB(wifiArray, response);
+
+                totalSaved += wifiArray.length;
+
+                // 다음 요청을 위한 인덱스 증가
+                startIndex += limit;
+
+                // 1000개 미만의 데이터가 반환되면 종료
+                if (wifiArray.length < limit) {
+                    moreData = false;
+                }
             }
-            rd.close();
-            conn.disconnect();
 
-            int startIndex = result.indexOf("\"row\":[");
-            if (startIndex == -1) {
-                response.getWriter().println("데이터가 없습니다.");
-                return;
-            }
-            int endIndex = result.indexOf("]", startIndex);
-            String rowArrayString = result.substring(startIndex + 7, endIndex);
-            String[] wifiArray = rowArrayString.split("},\\{");
+            response.getWriter().println("<html><body>");
+            response.getWriter().println("<h3>" + totalSaved + "개의 WIFI 정보를 정상적으로 저장하였습니다.</h3>");
+            response.getWriter().println("<a href='index.jsp'><button>홈으로 돌아가기</button></a>");
+            response.getWriter().println("</body></html>");
 
-            saveWifiDataToDB(wifiArray, response);
+            System.out.println("모든 데이터 수집 완료");
 
         } catch (Exception e) {
             e.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.getWriter().println("서버에서 오류가 발생했습니다: " + e.getMessage());
         }
-
-        response.getWriter().println("데이터 수집 및 저장 완료!");
     }
 
     private void saveWifiDataToDB(String[] wifiArray, HttpServletResponse response) {
-
-
         String insertSql =
                 "INSERT INTO wifi_info (wifi_mgr_no, wrdofc, main_nm, adres1, adres2, instl_floor, instl_ty, instl_mby, " +
                         "svc_se, cmcwr, cnstc_year, inout_door, remars3, lat, lnt, work_dttm, distance) " +
                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try {
+
             Class.forName("com.mysql.cj.jdbc.Driver");
             try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
                  PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
 
-                conn.createStatement().executeUpdate("DELETE FROM wifi_info");
 
                 for (String wifiData : wifiArray) {
                     pstmt.setString(1, extractField(wifiData, "X_SWIFI_MGR_NO"));
