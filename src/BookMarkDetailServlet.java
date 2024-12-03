@@ -66,4 +66,40 @@ public class BookMarkDetailServlet extends HttpServlet {
             response.getWriter().println("데이터베이스 오류: " + e.getMessage());
         }
     }
+
+
+    @Override
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        String bookmarkIdParam = request.getParameter("bookmark_id");
+
+        if (bookmarkIdParam != null && !bookmarkIdParam.isEmpty()) {
+            int bookmarkId = Integer.parseInt(bookmarkIdParam);
+
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                // DELETE 쿼리 작성
+                String deleteSql = "DELETE FROM bookmark_wifi WHERE bookmark_id = ?";
+
+                try (PreparedStatement pstmt = conn.prepareStatement(deleteSql)) {
+                    pstmt.setInt(1, bookmarkId);
+                    int rowsAffected = pstmt.executeUpdate();
+
+                    if (rowsAffected > 0) {
+                        response.setStatus(HttpServletResponse.SC_OK);
+                        response.getWriter().println("북마크가 삭제되었습니다.");
+                    } else {
+                        response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                        response.getWriter().println("해당 북마크를 찾을 수 없습니다.");
+                    }
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                response.getWriter().println("데이터베이스 오류: " + e.getMessage());
+            }
+        } else {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().println("유효하지 않은 요청입니다. bookmark_id를 확인하세요.");
+        }
+    }
 }
