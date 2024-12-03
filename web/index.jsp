@@ -4,16 +4,16 @@
 <head>
     <title>서울시 공공와이파이 서비스</title>
     <style>
+
         body {
             font-family: Arial, sans-serif;
         }
-
 
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
-            font-size: 14px; /* 테이블 폰트 크기 설정 */
+            font-size: 14px;
         }
 
         table, th, td {
@@ -23,6 +23,11 @@
         th, td {
             padding: 8px 12px;
             text-align: left;
+            word-wrap: break-word; /* 긴 단어는 줄바꿈 */
+            white-space: normal; /* 텍스트가 자동으로 줄 바꿈되게 */
+            max-width: 200px; /* 모든 td의 최대 너비 설정 */
+            overflow: hidden; /* 넘치는 내용은 숨김 처리 */
+            text-overflow: ellipsis; /* 넘치면 ... 으로 표시 */
         }
 
         th {
@@ -30,15 +35,20 @@
             font-weight: bold;
         }
 
-        td {
-            word-wrap: break-word;
+        td.work-dttm {
+            max-width: 300px; /* work_dttm 컬럼 너비를 더 넓게 설정 */
+            white-space: nowrap; /* 텍스트가 줄 바꿈되지 않게 설정 */
+            overflow: hidden;
+            text-overflow: ellipsis; /* 넘치는 텍스트를 "..."으로 표시 */
         }
 
         #wifiTableContainer {
-            max-width: 1600px;
+            max-width: 1500px;
             margin: 0 auto;
+            overflow-x: auto; /* 테이블 내용이 화면을 넘지 않도록 스크롤 추가 */
         }
     </style>
+
 </head>
 <body>
 <h1>서울시 공공와이파이 위치 정보 보기</h1>
@@ -146,21 +156,20 @@
             wifiData.forEach(function (wifi) {
                 tableHtml += "<tr>" +
                     "<td>" + wifi.distance.toFixed(2) + " km</td>" +
-                    "<td>" + wifi.X_SWIFI_MGR_NO + "</td>" +
-                    "<td>" + wifi.X_SWIFI_WRDOFC + "</td>" +
-                    "<td><a href='/wifiDetails?wifiName=" + wifi.X_SWIFI_MAIN_NM + "'>" + wifi.X_SWIFI_MAIN_NM + "</a></td>" +
-                    "<td>" + wifi.X_SWIFI_ADRES1 + "</td>" +
-                    "<td>" + wifi.X_SWIFI_ADRES2 + "</td>" +
-                    "<td>" + wifi.X_SWIFI_INSTL_FLOOR + "</td>" +
-                    "<td>" + wifi.X_SWIFI_INSTL_TY + "</td>" +
-                    "<td>" + wifi.X_SWIFI_INSTL_MBY + "</td>" +
-                    "<td>" + wifi.X_SWIFI_SVC_SE + "</td>" +
-                    "<td>" + wifi.X_SWIFI_CMCWR + "</td>" +
-                    "<td>" + wifi.X_SWIFI_CNSTC_YEAR + "</td>" +
-                    "<td>" + wifi.X_SWIFI_INOUT_DOOR + "</td>" +
-                    "<td>" + wifi.LAT + "</td>" +
-                    "<td>" + wifi.LNT + "</td>" +
-                    "<td>" + wifi.WORK_DTTM + "</td>" +
+                    "<td>" + wifi.wifi_mgr_no + "</td>" +
+                    "<td>" + wifi.wrdofc + "</td>" +
+                    "<td><a href='/wifiDetails?wifiName=" + wifi.main_nm + "'>" + wifi.main_nm + "</a></td>" +
+                    "<td>" + wifi.adres1 + "</td>" +
+                    "<td>" + wifi.adres2 + "</td>" +
+                    "<td>" + wifi.instl_ty + "</td>" +
+                    "<td>" + wifi.instl_mby + "</td>" +
+                    "<td>" + wifi.svc_se + "</td>" +
+                    "<td>" + wifi.cmcwr + "</td>" +
+                    "<td>" + wifi.cnstc_year + "</td>" +
+                    "<td>" + wifi.inout_door + "</td>" +
+                    "<td>" + wifi.lat + "</td>" +
+                    "<td>" + wifi.lnt + "</td>" +
+                    "<td>" + wifi.work_dttm + "</td>" +
                     "</tr>";
             });
 

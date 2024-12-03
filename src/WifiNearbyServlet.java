@@ -3,20 +3,23 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.util.HashSet;
-import java.util.Set;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @WebServlet("/wifiNear")
 public class WifiNearbyServlet extends HttpServlet {
+
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/wifi_service";
+    private static final String DB_USER = "test";
+    private static final String DB_PASSWORD = "yy223200@@";
+
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         String userLat = request.getParameter("lat");
         String userLng = request.getParameter("lng");
 
@@ -26,93 +29,75 @@ public class WifiNearbyServlet extends HttpServlet {
             return;
         }
 
-        System.out.println(userLat + " " + userLng);
-
-        String apiKey = "6b494b70436a6f6d313330577752636e"; // 실제 API 키로 교체
-        StringBuilder result = new StringBuilder();
-
-        try {
-            String apiUrl = "http://openapi.seoul.go.kr:8088/" + URLEncoder.encode(apiKey, "UTF-8") +
-                    "/json/TbPublicWifiInfo/1/1000";
-            URL url = new URL(apiUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Content-type", "application/json");
-
-            BufferedReader rd = (conn.getResponseCode() >= 200 && conn.getResponseCode() <= 300)
-                    ? new BufferedReader(new InputStreamReader(conn.getInputStream()))
-                    : new BufferedReader(new InputStreamReader(conn.getErrorStream()));
-
-            String line;
-            while ((line = rd.readLine()) != null) {
-                result.append(line);
-            }
-            rd.close();
-            conn.disconnect();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        // JSON 문자열에서 직접 파싱
-        String responseJson = result.toString();
-        String[] rows = responseJson.split("\"row\":\\[")[1].split("]")[0].split("\\},\\{");
-        StringBuilder filteredJson = new StringBuilder();
-        filteredJson.append("{\"wifiData\":[");
-
         double userLatDouble = Double.parseDouble(userLat);
         double userLngDouble = Double.parseDouble(userLng);
 
-        // Set을 사용하여 중복된 Wi-Fi 이름을 저장
-        Set<String> seenWifiNames = new HashSet<>();
+        System.out.println("User Latitude: " + userLat);
+        System.out.println("User Longitude: " + userLng);
 
-        for (String row : rows) {
-            if (!row.startsWith("{")) row = "{" + row;
-            if (!row.endsWith("}")) row = row + "}";
+        List<JSONObject> wifiList = getNearbyWifi(userLatDouble, userLngDouble);
 
-            String wifiName = extractValue(row, "\"X_SWIFI_MAIN_NM\":\"");
-            if (seenWifiNames.contains(wifiName)) {
-                continue; // 중복된 Wi-Fi 이름은 건너뜁니다
-            }
+        JSONArray wifiArray = new JSONArray(wifiList);
+        JSONObject result = new JSONObject();
+        result.put("wifiData", wifiArray);
 
-            String latStr = extractValue(row, "\"LAT\":\"");
-            String lngStr = extractValue(row, "\"LNT\":\"");
-
-            double wifiLat = Double.parseDouble(latStr);
-            double wifiLng = Double.parseDouble(lngStr);
-            double distance = calculateDistance(userLatDouble, userLngDouble, wifiLat, wifiLng);
-
-            if (distance <= 10) {
-                row = row.substring(0, row.length() - 1) + ",\"distance\":" + distance + "}";
-                filteredJson.append(row).append(",");
-                seenWifiNames.add(wifiName); // 중복을 피하기 위해 Wi-Fi 이름을 Set에 추가
-            }
-        }
-
-        if (filteredJson.charAt(filteredJson.length() - 1) == ',') {
-            filteredJson.deleteCharAt(filteredJson.length() - 1);
-        }
-        filteredJson.append("]}");
+        System.out.println(result.toString());
 
         response.setContentType("application/json; charset=UTF-8");
-        PrintWriter out = response.getWriter();
-        out.print(filteredJson);
-        out.flush();
+        response.getWriter().write(result.toString());
     }
 
-    private String extractValue(String json, String key) {
-        int startIndex = json.indexOf(key) + key.length();
-        int endIndex = json.indexOf("\"", startIndex);
-        return json.substring(startIndex, endIndex);
-    }
+    private List<JSONObject> getNearbyWifi(double userLat, double userLng) {
+        List<JSONObject> wifiList = new ArrayList<>();
+        String sql = "SELECT wifi_mgr_no, wrdofc, main_nm, adres1, adres2, instl_floor, instl_ty, instl_mby, svc_se, cmcwr, cnstc_year, inout_door, remars3, lat, lnt, work_dttm, " +
+                "(6371 * acos(LEAST(1.0, COS(radians(37.5665)) * COS(radians(lat)) * COS(radians(lnt) - radians(126.978)) + SIN(radians(37.5665)) * SIN(radians(lat))))) AS distance " +
+                "FROM wifi_info " +
+                "WHERE (6371 * acos(LEAST(1.0, COS(radians(37.5665)) * COS(radians(lat)) * COS(radians(lnt) - radians(126.978)) + SIN(radians(37.5665)) * SIN(radians(lat))))) <= 10 " +
+                "ORDER BY distance";
 
-    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371;
-        double latDistance = Math.toRadians(lat2 - lat1);
-        double lonDistance = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
+        try {
+            // MySQL JDBC 드라이버를 명시적으로 로드
+            Class.forName("com.mysql.cj.jdbc.Driver");
+
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+                System.out.println(sql);
+
+
+                ResultSet rs = stmt.executeQuery();
+                while (rs.next()) {
+                    JSONObject wifi = new JSONObject();
+                    wifi.put("wifi_mgr_no", rs.getString("wifi_mgr_no"));
+                    wifi.put("wrdofc", rs.getString("wrdofc"));
+                    wifi.put("main_nm", rs.getString("main_nm"));
+                    wifi.put("adres1", rs.getString("adres1"));
+                    wifi.put("adres2", rs.getString("adres2"));
+                    wifi.put("instl_floor", rs.getString("instl_floor"));
+                    wifi.put("instl_ty", rs.getString("instl_ty"));
+                    wifi.put("instl_mby", rs.getString("instl_mby"));
+                    wifi.put("svc_se", rs.getString("svc_se"));
+                    wifi.put("cmcwr", rs.getString("cmcwr"));
+                    wifi.put("cnstc_year", rs.getString("cnstc_year"));
+                    wifi.put("inout_door", rs.getString("inout_door"));
+                    wifi.put("remars3", rs.getString("remars3"));
+                    wifi.put("lat", rs.getDouble("lat"));
+                    wifi.put("lnt", rs.getDouble("lnt"));
+                    wifi.put("work_dttm", rs.getString("work_dttm"));
+                    wifi.put("distance", rs.getDouble("distance"));
+                    wifiList.add(wifi);
+                }
+
+                System.out.println("잘 호출되었습니다.");
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        return wifiList;
     }
 }

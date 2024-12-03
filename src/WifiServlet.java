@@ -13,6 +13,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.Set;
 
 @WebServlet("/wifi")
 public class WifiServlet extends HttpServlet {
@@ -29,6 +31,8 @@ public class WifiServlet extends HttpServlet {
             Class.forName("com.mysql.cj.jdbc.Driver");
             try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                 conn.createStatement().executeUpdate("TRUNCATE TABLE wifi_info");
+                conn.createStatement().executeUpdate("ALTER TABLE wifi_info ADD CONSTRAINT unique_wifi_name UNIQUE (main_nm);");
+
                 System.out.println("wifi_info 테이블 초기화 완료!");
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -129,7 +133,10 @@ public class WifiServlet extends HttpServlet {
                  PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
 
 
+
                 for (String wifiData : wifiArray) {
+
+
                     pstmt.setString(1, extractField(wifiData, "X_SWIFI_MGR_NO"));
                     pstmt.setString(2, extractField(wifiData, "X_SWIFI_WRDOFC"));
                     pstmt.setString(3, extractField(wifiData, "X_SWIFI_MAIN_NM"));
