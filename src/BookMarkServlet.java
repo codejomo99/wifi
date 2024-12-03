@@ -1,2 +1,96 @@
-public class BookMarkServlet {
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+
+@WebServlet("/bookmark")
+public class BookMarkServlet extends HttpServlet {
+
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/wifi_service";
+    private static final String DB_USER = "test";
+    private static final String DB_PASSWORD = "yy223200@@";
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        String wifiInfoId = request.getParameter("wifi_info_id");
+        String bookmarkName = request.getParameter("bookmark_name");
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+            // 1. 북마크 추가 (있으면 기존 ID 가져오기)
+            int bookmarkId = getOrCreateBookmarkId(conn, bookmarkName);
+
+            // 2. 북마크와 Wi-Fi 매핑
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "INSERT INTO bookmark_wifi (bookmark_id, wifi_info_id) VALUES (?, ?)")) {
+                pstmt.setInt(1, bookmarkId);
+                pstmt.setInt(2, Integer.parseInt(wifiInfoId));
+                pstmt.executeUpdate();
+                response.getWriter().println("Wi-Fi가 북마크에 추가되었습니다.");
+                System.out.println("Wi-Fi가 북마크에 추가되었습니다.");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            response.getWriter().println("북마크 추가 중 오류 발생: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        String wifiInfoId = request.getParameter("wifi_info_id");
+        String bookmarkId = request.getParameter("bookmark_id");
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(
+                     "DELETE FROM bookmark_wifi WHERE bookmark_id = ? AND wifi_info_id = ?")) {
+            pstmt.setInt(1, Integer.parseInt(bookmarkId));
+            pstmt.setInt(2, Integer.parseInt(wifiInfoId));
+            pstmt.executeUpdate();
+            response.getWriter().println("북마크에서 Wi-Fi가 삭제되었습니다.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            response.getWriter().println("북마크 삭제 중 오류 발생: " + e.getMessage());
+        }
+    }
+
+    private int getOrCreateBookmarkId(Connection conn, String bookmarkName) throws SQLException {
+        int bookmarkId = -1;
+
+        // 기존 북마크 ID 조회
+        try (PreparedStatement pstmt = conn.prepareStatement(
+                "SELECT id FROM bookmark WHERE bookmark_name = ?")) {
+            pstmt.setString(1, bookmarkName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    bookmarkId = rs.getInt("id");
+                }
+            }
+        }
+
+        // 북마크 없으면 새로 생성
+        if (bookmarkId == -1) {
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "INSERT INTO bookmark (bookmark_name, created_at, updated_at) VALUES (?, NOW(), NOW())",
+                    PreparedStatement.RETURN_GENERATED_KEYS)) {
+                pstmt.setString(1, bookmarkName);
+                pstmt.executeUpdate();
+                try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        bookmarkId = rs.getInt(1);
+                    }
+                }
+            }
+        }
+
+        return bookmarkId;
+    }
 }
