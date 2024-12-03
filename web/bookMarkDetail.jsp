@@ -77,7 +77,7 @@
         <td><%= bookmark.getCreatedAt() != null ? bookmark.getCreatedAt().toString() : "" %></td>
         <td>
             <!-- 북마크 삭제 버튼 -->
-            <button onclick="deleteBookMark(<%= bookmark.getId() %>)">삭제</button>
+            <button onclick="deleteBookMark(<%= bookmark.getId() %>, '<%= bookmark.getWifiName() %>')">삭제</button>
         </td>
     </tr>
     <%
@@ -88,22 +88,20 @@
 </table>
 
 <script>
-    function deleteBookMark(bookmarkId) {
+    function deleteBookMark(bookmarkId , wifiName) {
         if (confirm('정말 삭제하겠습니까?')) {
             const xhr = new XMLHttpRequest();
             console.log(bookmarkId);  // 삭제하려는 북마크의 ID 확인
 
             // DELETE 요청을 보낼 때 URL에 bookmarkId를 추가하여 서버에 전달
-            xhr.open('DELETE', '/bookmarkdetail?bookmark_id=' + bookmarkId, true);
+            xhr.open('DELETE', '/bookmarkdetail?bookmark_id=' + bookmarkId + '&main_nm=' + wifiName, true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
             xhr.onload = function() {
                 if (xhr.status === 200) {
                     alert('북마크 그룹이 삭제되었습니다.');
-                    loadBookmarkList(); // 삭제 후 목록 갱신 (필요시 목록 갱신 함수 호출)
                     location.reload();
                 } else {
                     alert('삭제 실패');
-                    location.reload();
                 }
             };
             xhr.send();

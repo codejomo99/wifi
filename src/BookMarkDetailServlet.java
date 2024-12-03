@@ -72,25 +72,44 @@ public class BookMarkDetailServlet extends HttpServlet {
     protected void doDelete(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         String bookmarkIdParam = request.getParameter("bookmark_id");
+        String wifiNameParam = request.getParameter("main_nm");
 
-        if (bookmarkIdParam != null && !bookmarkIdParam.isEmpty()) {
+        if (bookmarkIdParam != null && !bookmarkIdParam.isEmpty() && wifiNameParam != null && !wifiNameParam.isEmpty()) {
             int bookmarkId = Integer.parseInt(bookmarkIdParam);
 
             try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-                // DELETE 쿼리 작성
-                String deleteSql = "DELETE FROM bookmark_wifi WHERE bookmark_id = ?";
+                // wifiName으로 wifi_info_id를 찾는 SQL 쿼리
+                String getWifiInfoIdSql = "SELECT id FROM wifi_info WHERE main_nm = ?";
 
-                try (PreparedStatement pstmt = conn.prepareStatement(deleteSql)) {
-                    pstmt.setInt(1, bookmarkId);
-                    int rowsAffected = pstmt.executeUpdate();
-
-                    if (rowsAffected > 0) {
-                        response.setStatus(HttpServletResponse.SC_OK);
-                        response.getWriter().println("북마크가 삭제되었습니다.");
-                    } else {
-                        response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                        response.getWriter().println("해당 북마크를 찾을 수 없습니다.");
+                String wifiInfoId = null;
+                try (PreparedStatement pstmt = conn.prepareStatement(getWifiInfoIdSql)) {
+                    pstmt.setString(1, wifiNameParam);
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        if (rs.next()) {
+                            wifiInfoId = rs.getString("id"); // wifi_info_id 가져오기
+                        }
                     }
+                }
+
+                if (wifiInfoId != null) {
+                    // bookmark_id와 wifi_info_id가 일치하는 경우 삭제 쿼리 실행
+                    String deleteSql = "DELETE FROM bookmark_wifi WHERE bookmark_id = ? AND wifi_info_id = ?";
+                    try (PreparedStatement pstmt = conn.prepareStatement(deleteSql)) {
+                        pstmt.setInt(1, bookmarkId);
+                        pstmt.setString(2, wifiInfoId);
+
+                        int rowsAffected = pstmt.executeUpdate();
+                        if (rowsAffected > 0) {
+                            response.setStatus(HttpServletResponse.SC_OK);
+                            response.getWriter().println("북마크가 삭제되었습니다.");
+                        } else {
+                            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                            response.getWriter().println("해당 북마크를 찾을 수 없습니다.");
+                        }
+                    }
+                } else {
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    response.getWriter().println("Wi-Fi 정보가 존재하지 않습니다.");
                 }
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -99,7 +118,7 @@ public class BookMarkDetailServlet extends HttpServlet {
             }
         } else {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            response.getWriter().println("유효하지 않은 요청입니다. bookmark_id를 확인하세요.");
+            response.getWriter().println("유효하지 않은 요청입니다. bookmark_id와 main_nm을 확인하세요.");
         }
     }
 }
