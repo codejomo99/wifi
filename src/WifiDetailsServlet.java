@@ -5,36 +5,78 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.sql.*;
 
 @WebServlet("/wifiDetails")
 public class WifiDetailsServlet extends HttpServlet {
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        // 요청된 wifiName을 URL 파라미터에서 가져옵니다.
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/wifi_service";
+    private static final String DB_USER = "test";
+    private static final String DB_PASSWORD = "yy223200@@";
+
+    // 드라이버 로드
+    static {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");  // MySQL JDBC 드라이버 로드
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+            throw new RuntimeException("MySQL JDBC Driver 로드 실패", e);
+        }
+    }
+
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
         String wifiName = request.getParameter("wifiName");
-
-        // 실제 데이터는 서울시 공공 와이파이 API나 다른 방식으로 가져올 수 있음
-        // 여기서는 예시로 static 데이터로 설정합니다.
-        WifiDetails wifiDetails = null;
-
-        // 와이파이 상세 정보 샘플 (API 호출하여 데이터를 가져오는 대신 예시 데이터를 사용)
-        if (wifiName != null) {
-            wifiDetails = new WifiDetails();
-            wifiDetails.setWifiName(wifiName);
-            wifiDetails.setMgrNo("ARI00001");
-            wifiDetails.setAddress("서소문로 51");
-            wifiDetails.setInstallationType("7-1-3. 공공 - 시산하기관");
-            wifiDetails.setInstallationYear("2024");
-            wifiDetails.setInstallationAgency("서울시(AP)");
-            wifiDetails.setLatitude("37.561924");
-            wifiDetails.setLongitude("126.96675");
-            wifiDetails.setFloor("1F");
-            wifiDetails.setServiceType("공공WiFi");
+        if (wifiName == null || wifiName.isEmpty()) {
+            response.getWriter().println("와이파이 이름을 제공해야 합니다.");
+            return;
         }
 
-        // 데이터를 request 객체에 저장
-        request.setAttribute("wifiDetails", wifiDetails);
+        // 데이터베이스 연결
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+            // 1. 와이파이 상세 정보 조회
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "SELECT id, wifi_mgr_no, wrdofc, main_nm, adres1, adres2, instl_floor, instl_ty, instl_mby, svc_se, cmcwr, cnstc_year, inout_door, remars3, lat, lnt, work_dttm, distance "
+                            +
+                            "FROM wifi_info WHERE main_nm = ?")) {
+                pstmt.setString(1, wifiName);  // 파라미터로 전달된 wifiName을 사용
 
-        // wifiDetails.jsp로 포워딩
-        request.getRequestDispatcher("/wifiDetails.jsp").forward(request, response);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    // 결과가 없으면 오류 처리
+                    if (!rs.next()) {
+                        response.getWriter().println("해당 와이파이 정보가 없습니다.");
+                        return;
+                    }
+
+                    // 와이파이 정보 객체 생성
+                    WifiDetails wifiDetails = new WifiDetails();
+                    wifiDetails.setId(rs.getInt("id"));
+                    wifiDetails.setMgrNo(rs.getString("wifi_mgr_no"));
+                    wifiDetails.setWrdofc(rs.getString("wrdofc"));
+                    wifiDetails.setWifiName(rs.getString("main_nm"));
+                    wifiDetails.setAddress(rs.getString("adres1") + " " + rs.getString("adres2"));
+                    wifiDetails.setFloor(rs.getString("instl_floor"));
+                    wifiDetails.setInstallationType(rs.getString("instl_ty"));
+                    wifiDetails.setInstallationAgency(rs.getString("instl_mby"));
+                    wifiDetails.setServiceType(rs.getString("svc_se"));
+                    wifiDetails.setCmcwr(rs.getString("cmcwr"));
+                    wifiDetails.setInstallationYear(rs.getString("cnstc_year"));
+                    wifiDetails.setInoutDoor(rs.getString("inout_door"));
+                    wifiDetails.setRemarks(rs.getString("remars3"));
+                    wifiDetails.setLatitude(rs.getString("lat"));
+                    wifiDetails.setLongitude(rs.getString("lnt"));
+                    wifiDetails.setWorkDttm(rs.getString("work_dttm"));
+                    wifiDetails.setDistance(rs.getString("distance"));
+
+                    // 데이터를 request 객체에 저장하여 JSP로 전달
+                    request.setAttribute("wifiDetails", wifiDetails);
+
+                    // wifiDetails.jsp로 포워딩
+                    request.getRequestDispatcher("/wifiDetails.jsp").forward(request, response);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            response.getWriter().println("와이파이 정보 조회 중 오류 발생: " + e.getMessage());
+        }
     }
 }

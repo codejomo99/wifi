@@ -1,3 +1,4 @@
+<%@ page import="dto.WifiDetails" %>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <!DOCTYPE html>
 <html>
@@ -71,18 +72,24 @@
 <div class="details-container">
     <h2>와이파이 상세 정보</h2>
 
-    <c:if test="${not empty wifiDetails}">
-        <div class="detail-item"><span>와이파이명:</span> ${wifiDetails.wifiName}</div>
-        <div class="detail-item"><span>관리번호:</span> ${wifiDetails.mgrNo}</div>
-        <div class="detail-item"><span>주소:</span> ${wifiDetails.address}</div>
-        <div class="detail-item"><span>설치 유형:</span> ${wifiDetails.installationType}</div>
-        <div class="detail-item"><span>설치 연도:</span> ${wifiDetails.installationYear}</div>
-        <div class="detail-item"><span>설치 기관:</span> ${wifiDetails.installationAgency}</div>
-        <div class="detail-item"><span>위도:</span> ${wifiDetails.latitude}</div>
-        <div class="detail-item"><span>경도:</span> ${wifiDetails.longitude}</div>
-        <div class="detail-item"><span>층수:</span> ${wifiDetails.floor}</div>
-        <div class="detail-item"><span>서비스 종류:</span> ${wifiDetails.serviceType}</div>
-    </c:if>
+
+    <%
+        WifiDetails wifiDetails = (WifiDetails) request.getAttribute("wifiDetails");
+        if (wifiDetails != null) {
+    %>
+    <div class="detail-item"><span>와이파이명:</span> <%= wifiDetails.getWifiName() %></div>
+    <div class="detail-item"><span>관리번호:</span> <%= wifiDetails.getMgrNo() %></div>
+    <div class="detail-item"><span>주소:</span> <%= wifiDetails.getAddress() %></div>
+    <div class="detail-item"><span>설치 유형:</span> <%= wifiDetails.getInstallationType() %></div>
+    <div class="detail-item"><span>설치 연도:</span> <%= wifiDetails.getInstallationYear() %></div>
+    <div class="detail-item"><span>설치 기관:</span> <%= wifiDetails.getInstallationAgency() %></div>
+    <div class="detail-item"><span>위도:</span> <%= wifiDetails.getLatitude() %></div>
+    <div class="detail-item"><span>경도:</span> <%= wifiDetails.getLongitude() %></div>
+    <div class="detail-item"><span>층수:</span> <%= wifiDetails.getFloor() %></div>
+    <div class="detail-item"><span>서비스 종류:</span> <%= wifiDetails.getServiceType() %></div>
+    <%
+        }
+    %>
 
     <div class="back-btn">
         <a href="javascript:history.back()">뒤로 가기</a>
@@ -119,7 +126,6 @@
         xhr.send();
     }
 
-    // 북마크 추가하기 동작 (예시)
     function addBookmark() {
         const selectedGroupId = document.getElementById('bookmarkSelect').value;
         const bookmarkName = document.getElementById('bookmarkSelect').selectedOptions[0].textContent; // 선택된 그룹의 이름
@@ -142,6 +148,7 @@
         xhr.onload = function() {
             if (xhr.status === 200) {
                 alert('북마크가 추가되었습니다!');
+                window.location.href = '/bookmarkdetail';
             } else {
                 alert('북마크 추가에 실패했습니다.');
             }

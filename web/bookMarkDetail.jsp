@@ -103,6 +103,7 @@
                     location.reload();
                 } else {
                     alert('삭제 실패');
+                    location.reload();
                 }
             };
             xhr.send();
